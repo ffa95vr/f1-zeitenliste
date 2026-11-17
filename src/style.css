@@ -106,3 +106,4 @@ body.tv .tvr,body.tv .tvbar button{border-color:#3A3A3A}
 body.tv .tvbar button.on{border-color:var(--ac)}
 body.tv .r1,body.tv .r2,body.tv .r3{border-color:transparent}
 .r1 .gp,.r2 .gp,.r3 .gp{color:#333333}
+.tvhinweis{font-size:clamp(18px,2.4vw,32px);color:var(--mu);max-width:900px;line-height:1.4}

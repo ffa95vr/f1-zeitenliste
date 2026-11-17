@@ -329,7 +329,12 @@ function stopTv() { if (tvTimer) { clearInterval(tvTimer); tvTimer = null; } tvN
 function tvDraw() {
   if (!tvBox) return;
   tvBox.textContent = "";
-  const T = allTracks();
+  const T = allTracks(), st = store.status();
+  if (!st.hatCode) {
+    tvBox.appendChild(el("div", "tvh", "Kein Event-Code"));
+    tvBox.appendChild(el("div", "tvhinweis", "Dieser Bildschirm kennt den Event-Code nicht und kann keine Zeiten laden. Die Seite mit dem Link inklusive ?code=… öffnen (wie im QR-Code am Handy unter „Mehr“)."));
+    return;
+  }
   if (!T.length) { tvBox.appendChild(el("div", "tvh", "Noch keine Zeiten – trag die erste ein!")); return; }
   const tn = T[tvI % T.length], L = E().filter(e => e.tr === tn && (tvScope === "all" || e.st === tvScope)), all = best(L), b = all.slice(0, 10);
   const h = el("div", "tvh", tn); h.appendChild(el("span", null, (tvScope === "all" ? "Alle Rigs" : "Rig " + tvScope) + " · " + all.length + " Fahrer")); tvBox.appendChild(h);
