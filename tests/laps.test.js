@@ -48,5 +48,7 @@ describe("Hilfen", () => {
     expect(codeAusLink("?code=3mdfrdzw")).toBe("3mdfrdzw");
     expect(codeAusLink("?x=1")).toBe("");
     expect(codeAusLink("?code=<script>")).toBe("");
+    expect(codeAusLink("?code=PARTY%202026")).toBe("party2026");
+    expect(codeAusLink("?code=PARTY+2026")).toBe("party2026");
   });
 });

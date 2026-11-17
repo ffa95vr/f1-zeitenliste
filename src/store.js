@@ -9,7 +9,7 @@
 //   Zusätzlich alle 30 s und wenn die App wieder sichtbar oder online wird.
 
 import { createClient } from "@supabase/supabase-js";
-import { SPALTEN, rowToEntry, entryToRow, aenderungToRow, merge, fehlerArt, neueId, codeAusLink } from "./laps.js";
+import { SPALTEN, rowToEntry, entryToRow, aenderungToRow, merge, fehlerArt, neueId, codeAusLink, normCode } from "./laps.js";
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY_ = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -38,7 +38,7 @@ function statusMelden() { statusHoerer.forEach(f => f(status())); }
 export function load() {
   const ausLink = codeAusLink(location.search);
   if (ausLink) schreib(K_CODE, ausLink);
-  code = ausLink || lies(K_CODE, "");
+  code = ausLink || normCode(lies(K_CODE, ""));
   server = lies(K_CACHE, []);
   queue = lies(K_QUEUE, []);
   liste = merge(server, queue);

@@ -311,7 +311,7 @@ function codeEingabe(V, gross) {
   const b = el("button", "btn", "Übernehmen"), m = el("div", "msg");
   const go = () => {
     const c = i.value.trim().toLowerCase().replace(/\s+/g, "");
-    if (!/^[A-Za-z0-9_-]{4,64}$/.test(c)) { m.textContent = "Bitte den Event-Code eingeben (Buchstaben und Ziffern)."; return; }
+    if (!/^[a-z0-9_-]{4,64}$/.test(c)) { m.textContent = "Bitte den Event-Code eingeben (Buchstaben und Ziffern)."; return; }
     location.href = location.pathname + "?code=" + encodeURIComponent(c);
   };
   b.onclick = go; i.onkeydown = ev => { if (ev.key === "Enter") go(); };

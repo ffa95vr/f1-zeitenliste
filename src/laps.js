@@ -63,8 +63,13 @@ export function neueId() {
   return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" + h.slice(16, 20) + "-" + h.slice(20);
 }
 
-// Event-Code aus dem Link (?code=…). Nur Buchstaben und Ziffern.
+// Event-Code vereinheitlichen: Kleinbuchstaben, ohne Leerzeichen („PARTY 2026“ → „party2026“).
+export function normCode(c) {
+  c = String(c || "").toLowerCase().replace(/\s+/g, "");
+  return /^[a-z0-9_-]{4,64}$/.test(c) ? c : "";
+}
+
+// Event-Code aus dem Link (?code=…).
 export function codeAusLink(search) {
-  const c = new URLSearchParams(search || "").get("code");
-  return c && /^[A-Za-z0-9_-]{4,64}$/.test(c) ? c : "";
+  return normCode(new URLSearchParams(search || "").get("code"));
 }
