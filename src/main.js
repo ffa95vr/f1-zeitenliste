@@ -303,6 +303,22 @@ function mehr(V) {
   allesLoeschen(V);
 }
 
+// Eingabe des Event-Codes, falls der Link ohne ?code=… geöffnet wurde (z. B. am Fernseher).
+// Lädt die Seite mit dem Code im Link neu; ob er stimmt, prüft die Datenbank.
+function codeEingabe(V, gross) {
+  const f = el("div", "codein" + (gross ? " gross" : ""));
+  const i = el("input"); i.type = "text"; i.autocomplete = "off"; i.placeholder = "Event-Code"; i.setAttribute("autocapitalize", "off");
+  const b = el("button", "btn", "Übernehmen"), m = el("div", "msg");
+  const go = () => {
+    const c = i.value.trim();
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(c)) { m.textContent = "Bitte den Event-Code eingeben (Buchstaben und Ziffern)."; return; }
+    location.href = location.pathname + "?code=" + encodeURIComponent(c);
+  };
+  b.onclick = go; i.onkeydown = ev => { if (ev.key === "Enter") go(); };
+  f.appendChild(i); f.appendChild(b); f.appendChild(m); V.appendChild(f);
+  return f;
+}
+
 // ---------- Datenschutz ----------
 function datenschutz(V) {
   const c = el("div", "card text");
@@ -328,11 +344,13 @@ function stopTv() { if (tvTimer) { clearInterval(tvTimer); tvTimer = null; } tvN
 
 function tvDraw() {
   if (!tvBox) return;
+  if (!store.status().hatCode && tvBox.querySelector(".codein")) return; // Eingabefeld nicht beim Tippen zurücksetzen
   tvBox.textContent = "";
   const T = allTracks(), st = store.status();
   if (!st.hatCode) {
     tvBox.appendChild(el("div", "tvh", "Kein Event-Code"));
-    tvBox.appendChild(el("div", "tvhinweis", "Dieser Bildschirm kennt den Event-Code nicht und kann keine Zeiten laden. Die Seite mit dem Link inklusive ?code=… öffnen (wie im QR-Code am Handy unter „Mehr“)."));
+    tvBox.appendChild(el("div", "tvhinweis", "Dieser Bildschirm kennt den Event-Code nicht und kann keine Zeiten laden. Code hier eingeben:"));
+    codeEingabe(tvBox, true);
     return;
   }
   if (!T.length) { tvBox.appendChild(el("div", "tvh", "Noch keine Zeiten – trag die erste ein!")); return; }
@@ -600,13 +618,25 @@ function drawLast() {
 }
 
 // ---------- Statuszeile (Verbindung, wartende Zeiten, Fehler) ----------
+let statusAlt = "";
 function drawStatus(s) {
   const S = document.getElementById("status"); if (!S) return;
+  const key = JSON.stringify(s);
+  if (key === statusAlt) return; // unverändert: nicht neu zeichnen (Eingabefeld bleibt)
+  statusAlt = key;
   S.textContent = ""; S.className = "status";
   let t = "", warn = false;
   if (!s.konfiguriert) { t = s.fehler; warn = true; }
-  else if (!s.hatCode) { t = "Kein Event-Code – bitte den QR-Code vor Ort scannen."; warn = true; }
-  else if (s.codeFalsch) { t = "Event-Code ungültig – bitte den QR-Code neu scannen."; warn = true; }
+  else if (!s.hatCode) {
+    S.appendChild(el("div", "status warn", "Kein Event-Code – QR-Code vor Ort scannen oder Code eingeben:"));
+    codeEingabe(S, false);
+    return;
+  }
+  else if (s.codeFalsch) {
+    S.appendChild(el("div", "status warn", "Event-Code ungültig – QR-Code neu scannen oder richtigen Code eingeben:"));
+    codeEingabe(S, false);
+    return;
+  }
   else if (!s.online) { t = "Offline" + (s.wartend ? " – " + s.wartend + (s.wartend === 1 ? " Zeit wartet" : " Zeiten warten") + " auf Versand" : " – zeige zuletzt geladene Zeiten"); warn = true; }
   else if (s.wartend) { t = s.wartend + (s.wartend === 1 ? " Zeit wird" : " Zeiten werden") + " gesendet …"; }
   else if (!s.geladen) { t = "Lade Zeiten …"; }

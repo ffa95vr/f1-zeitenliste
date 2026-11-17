@@ -107,3 +107,10 @@ body.tv .tvbar button.on{border-color:var(--ac)}
 body.tv .r1,body.tv .r2,body.tv .r3{border-color:transparent}
 .r1 .gp,.r2 .gp,.r3 .gp{color:#333333}
 .tvhinweis{font-size:clamp(18px,2.4vw,32px);color:var(--mu);max-width:900px;line-height:1.4}
+.codein{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px}
+.codein input{flex:1;min-width:140px;max-width:320px;margin:0}
+.codein .btn{margin-top:0}
+.codein .msg{flex-basis:100%;margin-top:0}
+.codein.gross input{font-size:28px;padding:16px;max-width:420px}
+.codein.gross .btn{font-size:24px;padding:16px 26px}
+.codein.gross .msg{font-size:20px}
