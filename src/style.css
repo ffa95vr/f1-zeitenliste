@@ -60,3 +60,9 @@ h2{font-size:16px;margin:16px 0 4px}
 .status.warn{color:var(--on);background:var(--ac);border-radius:8px;padding:6px 10px;font-weight:600}
 .status.warn .x{color:var(--on);min-width:44px;min-height:32px}
 body.tv .status{display:none}
+input[type=email],input[type=password]{width:100%;padding:13px;font-size:18px;border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--tx)}
+.btn{min-height:44px}.btn:disabled{opacity:.6}
+.btn.sec{margin-left:8px;background:var(--bg);color:var(--tx);border:1px solid var(--ln)}
+.btn.danger{background:#ff8a80;color:#0F1830}
+.row .x{min-width:44px;min-height:44px}
+.card.edit{border:2px solid var(--ac)}

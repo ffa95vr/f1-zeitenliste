@@ -14,7 +14,7 @@ const LIM = 40; // erwartete Zahl der Gäste (Anzeige „Schon gefahren: x von 4
 // Zustand der Oberfläche
 let tab = "eintragen", sel = "R21", pend = null, ftrack = "*", wmode = "rig", wst = "R21";
 const zsel = { R21: 1, R5: 1, G29: 0 };
-let ctrack = "", ccar = "", fp = "";
+let ctrack = "", ccar = "", fp = "", editId = null;
 
 const E = () => store.entries();
 
@@ -76,6 +76,53 @@ function delBtn(e) {
   return x;
 }
 
+function editBtn(e) {
+  if (!store.isAdmin()) return document.createTextNode("");
+  const x = el("button", "x", "✎"); x.setAttribute("aria-label", "Bearbeiten");
+  x.onclick = () => { editId = e.id; pend = null; render(); };
+  return x;
+}
+
+// Bearbeiten-Karte (nur Admin). Gleiche Prüfung wie beim Eintragen.
+function editCard(e) {
+  const c = el("div", "card edit");
+  c.appendChild(el("h2", null, "Zeit bearbeiten"));
+  const n = field(c, "Name", ""); n.value = e.name;
+  const tr = field(c, "Strecke", "", "tl"); tr.value = e.tr; c.appendChild(opts("tl", allTracks().concat(TR)));
+  const car = field(c, "Auto / Team (optional)", "", "cl"); car.value = e.car || ""; c.appendChild(opts("cl", E().map(x => x.car).concat(CARS)));
+  c.appendChild(el("label", null, "Station"));
+  let st = e.st;
+  const sg = el("div", "seg");
+  STS.forEach(x => {
+    const b = el("button", st === x ? "on" : "", x);
+    b.onclick = () => { st = x; Array.prototype.forEach.call(sg.children, y => { y.className = y.textContent === x ? "on" : ""; }); };
+    sg.appendChild(b);
+  });
+  c.appendChild(sg);
+  const t = field(c, "Rundenzeit", "1.17,156"); t.inputMode = "numeric"; t.value = fmt(e.ms);
+  c.appendChild(el("label", null, "Sektorzeiten (optional)"));
+  const sr = el("div", "secs"), sI = [];
+  [0, 1, 2].forEach(i => {
+    const x = el("input"); x.type = "text"; x.autocomplete = "off"; x.inputMode = "numeric"; x.placeholder = "Sektor " + (i + 1);
+    x.value = e.s && e.s[i] ? fmtS(e.s[i]) : ""; sr.appendChild(x); sI.push(x);
+  });
+  c.appendChild(sr);
+  const m = el("div", "msg");
+  const ok = el("button", "btn", "Speichern");
+  ok.onclick = async () => {
+    const r = pruefeEintrag({ name: n.value, strecke: tr.value, zeit: t.value, sektoren: sI.map(i => i.value) });
+    if (r.fehler) { m.textContent = r.fehler; return; }
+    ok.disabled = true; m.textContent = "Wird gespeichert …";
+    try {
+      await store.update(e.id, { name: n.value.trim(), tr: tr.value.trim(), st, car: car.value.trim(), ms: r.ms, s: r.s });
+      editId = null; render();
+    } catch (err) { ok.disabled = false; m.textContent = err.message; }
+  };
+  const ab = el("button", "btn sec", "Abbrechen"); ab.onclick = () => { editId = null; render(); };
+  c.appendChild(ok); c.appendChild(ab); c.appendChild(m);
+  return c;
+}
+
 function selBox(V, label, opts, val, fn) {
   V.appendChild(el("label", null, label));
   const s = document.createElement("select");
@@ -94,7 +141,7 @@ function tabs() {
   [["eintragen", "Eintragen"], ["zeiten", "Zeiten"], ["fahrer", "Fahrer"], ["R21", "R21"], ["R5", "R5"], ["G29", "G29"],
     ["wertung", "Wertung"], ["gefahren", "Gefahren"], ["tv", "TV"], ["mehr", "Mehr"]].forEach(t => {
     const b = el("button", tab === t[0] ? "on" : "", t[1]);
-    b.onclick = () => { tab = t[0]; pend = null; render(); };
+    b.onclick = () => { tab = t[0]; pend = null; editId = null; render(); };
     T.appendChild(b);
   });
 }
@@ -158,7 +205,49 @@ async function importCsv(txt) {
   return neu.length + " Zeiten importiert, " + sk + " übersprungen.";
 }
 
+function adminCard(V) {
+  const c = el("div", "card"); c.appendChild(el("h2", null, "Admin"));
+  if (store.isAdmin()) {
+    c.appendChild(el("div", "sub", "Angemeldet als " + store.adminMail() + ". Löschen, Bearbeiten und Backup sind freigeschaltet."));
+    const b = el("button", "btn", "Abmelden"); b.onclick = async () => { await store.logout(); render(); }; c.appendChild(b);
+    V.appendChild(c); return;
+  }
+  c.appendChild(el("div", "sub", "Nur für den Organisator. Gäste brauchen keine Anmeldung."));
+  c.appendChild(el("label", null, "E-Mail"));
+  const em = el("input"); em.type = "email"; em.autocomplete = "username"; c.appendChild(em);
+  c.appendChild(el("label", null, "Passwort"));
+  const pw = el("input"); pw.type = "password"; pw.autocomplete = "current-password"; c.appendChild(pw);
+  const m = el("div", "msg");
+  const b = el("button", "btn", "Anmelden");
+  const go = async () => {
+    if (!em.value.trim() || !pw.value) { m.textContent = "Bitte E-Mail und Passwort eingeben."; return; }
+    b.disabled = true; m.textContent = "Anmelden …";
+    try { await store.login(em.value, pw.value); render(); }
+    catch (err) { b.disabled = false; m.textContent = err.message; }
+  };
+  b.onclick = go; pw.onkeydown = ev => { if (ev.key === "Enter") go(); };
+  c.appendChild(b); c.appendChild(m); V.appendChild(c);
+}
+
+function allesLoeschen(V) {
+  const c = el("div", "card"); c.appendChild(el("h2", null, "Alle Zeiten löschen"));
+  c.appendChild(el("div", "sub", "Nach dem Fest: zuerst oben ein CSV-Backup erstellen und sichern. Löschen kann nicht rückgängig gemacht werden."));
+  c.appendChild(el("label", null, "Zum Bestätigen LÖSCHEN eintippen"));
+  const i = el("input"); i.type = "text"; i.autocomplete = "off"; c.appendChild(i);
+  const m = el("div", "msg");
+  const b = el("button", "btn danger", "Alle " + E().length + " Zeiten löschen");
+  b.onclick = async () => {
+    if (i.value.trim().toUpperCase() !== "LÖSCHEN") { m.textContent = "Bitte LÖSCHEN eintippen."; return; }
+    b.disabled = true; m.textContent = "Wird gelöscht …";
+    try { const n = await store.removeAll(); i.value = ""; m.textContent = n + " Zeiten gelöscht."; b.textContent = "Alle " + E().length + " Zeiten löschen"; }
+    catch (err) { m.textContent = err.message; }
+    b.disabled = false;
+  };
+  c.appendChild(b); c.appendChild(m); V.appendChild(c);
+}
+
 function mehr(V) {
+  adminCard(V);
   const c1 = el("div", "card"); c1.appendChild(el("h2", null, "QR-Code zur App"));
   c1.appendChild(el("div", "sub", "Link der freigegebenen Seite einfügen, dann scannen die Gäste den Code."));
   const li = el("input"); li.type = "text"; li.autocomplete = "off"; li.placeholder = "https://…"; li.value = store.getLink(); c1.appendChild(li);
@@ -166,6 +255,7 @@ function mehr(V) {
   const draw = () => { qb.textContent = ""; if (li.value.trim()) qb.appendChild(qrBox(li.value.trim())); };
   const b1 = el("button", "btn", "QR-Code erstellen"); b1.onclick = () => { store.setLink(li.value.trim()); draw(); }; c1.appendChild(b1); draw(); V.appendChild(c1);
 
+  if (!store.isAdmin()) return; // Backup, Einspielen und Löschen nur für den Admin
   const c2 = el("div", "card"); c2.appendChild(el("h2", null, "Backup als CSV"));
   c2.appendChild(el("div", "sub", "Erstellt eine Liste aller Zeiten. Kopieren und z. B. in Excel oder eine Notiz einfügen."));
   const ta = el("textarea"); ta.readOnly = true; ta.placeholder = "Hier erscheint die CSV."; c2.appendChild(ta);
@@ -181,12 +271,12 @@ function mehr(V) {
   };
   c2.appendChild(b3); c2.appendChild(m2); V.appendChild(c2);
 
-  if (!store.isAdmin()) return; // Einspielen nur für den Admin (Schritt 3)
   const c3 = el("div", "card"); c3.appendChild(el("h2", null, "Backup einspielen"));
   c3.appendChild(el("div", "sub", "CSV hier einfügen. Schon vorhandene Zeiten werden nicht doppelt angelegt."));
   const t3 = el("textarea"); t3.placeholder = "CSV einfügen"; c3.appendChild(t3);
   const m3 = el("div", "msg");
   const b4 = el("button", "btn", "Importieren"); b4.onclick = async () => { m3.textContent = "Wird importiert …"; m3.textContent = await importCsv(t3.value); t3.value = ""; }; c3.appendChild(b4); c3.appendChild(m3); V.appendChild(c3);
+  allesLoeschen(V);
 }
 
 // ---------- TV-Modus ----------
@@ -323,8 +413,9 @@ function zeiten(V) {
   L.sort((a, b) => (b.ts - a.ts) || (b.id - a.id));
   V.appendChild(el("h2", null, L.length + (L.length === 1 ? " Zeit" : " Zeiten")));
   L.forEach(e => {
+    if (editId === e.id) { V.appendChild(editCard(e)); return; }
     const r = el("div", "row"), n = el("div", "nm"); n.appendChild(el("div", null, e.name)); n.appendChild(el("div", "sb", sbl(e, true)));
-    r.appendChild(n); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(delBtn(e)); V.appendChild(r);
+    r.appendChild(n); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(editBtn(e)); r.appendChild(delBtn(e)); V.appendChild(r);
   });
 }
 
@@ -393,7 +484,7 @@ function form(V) {
   const m = el("div", "msg");
   const g = el("button", "go", "Zeit speichern");
   g.onclick = () => {
-    if (!store.hatCode()) { m.textContent = "Kein Event-Code. Bitte den QR-Code vor Ort scannen."; return; }
+    if (!store.darfEintragen()) { m.textContent = "Kein Event-Code. Bitte den QR-Code vor Ort scannen."; return; }
     const r = pruefeEintrag({ name: n.value, strecke: tr.value, zeit: t.value, sektoren: sI.map(i => i.value) });
     if (r.fehler) { m.textContent = r.fehler; return; }
     const tn = vorhandeneSchreibweise(tr.value.trim(), allTracks());
@@ -440,14 +531,17 @@ function drawStatus(s) {
     const f = el("div", "status warn", s.fehler + " ");
     const x = el("button", "x", "✕"); x.onclick = () => store.fehlerWeg(); f.appendChild(x); S.appendChild(f);
   }
+  if (!t && s.admin) t = "Admin-Modus";
+  else if (t && s.admin && !warn) t = "Admin-Modus · " + t;
   if (t) S.appendChild(el("div", "status" + (warn ? " warn" : ""), t));
 }
 
 store.onStatus(drawStatus);
+store.onAdmin(() => { editId = null; pend = null; render(); });
 store.onChange(() => {
   if (tab === "tv") return tvLive();
   if (tab === "eintragen") return drawLast();
-  if (tab === "mehr") return; // Eingabefelder nicht zurücksetzen
+  if (tab === "mehr" || editId !== null) return; // Eingabefelder nicht zurücksetzen
   render();
 });
 store.load();

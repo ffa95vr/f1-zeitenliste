@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rowToEntry, entryToRow, merge, fehlerArt, neueId, codeAusLink } from "../src/laps.js";
+import { rowToEntry, entryToRow, aenderungToRow, merge, fehlerArt, neueId, codeAusLink } from "../src/laps.js";
 
 const ROW = { id: 7, client_id: "c1", name: "Anna", strecke: "Monza", station: "R21", auto: "Ferrari", zeit_ms: 77156,
   s1_ms: 25000, s2_ms: 26000, s3_ms: 26156, created_at: "2026-12-04T18:00:00+00:00" };
@@ -17,6 +17,13 @@ describe("Datenbankzeilen", () => {
   it("Import ohne Zeitstempel lässt ihn weg", () => expect(entryToRow({ name: "A", tr: "Spa", st: "G29", ms: 1, ts: 0 }, true).created_at).toBeUndefined());
   it("fehlende Sektoren als null", () => expect(entryToRow({ name: "A", tr: "Spa", st: "G29", ms: 9, s: [1, 0, 2] }, false))
     .toMatchObject({ s1_ms: 1, s2_ms: null, s3_ms: 2 }));
+});
+
+describe("Admin-Änderung", () => {
+  it("ändert keine client_id und keinen Zeitstempel", () => {
+    const r = aenderungToRow({ ...rowToEntry(ROW), name: "Anna B", s: null });
+    expect(r).toEqual({ name: "Anna B", strecke: "Monza", station: "R21", auto: "Ferrari", zeit_ms: 77156, s1_ms: null, s2_ms: null, s3_ms: null });
+  });
 });
 
 describe("Warteschlange", () => {

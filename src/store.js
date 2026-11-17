@@ -9,7 +9,7 @@
 //   Zusätzlich alle 30 s und wenn die App wieder sichtbar oder online wird.
 
 import { createClient } from "@supabase/supabase-js";
-import { SPALTEN, rowToEntry, entryToRow, merge, fehlerArt, neueId, codeAusLink } from "./laps.js";
+import { SPALTEN, rowToEntry, entryToRow, aenderungToRow, merge, fehlerArt, neueId, codeAusLink } from "./laps.js";
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL;
 const KEY_ = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -17,7 +17,8 @@ const K_CODE = "f1xmas_code", K_CACHE = "f1xmas_cache", K_QUEUE = "f1xmas_queue"
 
 let sb = null, code = "", server = [], queue = [], liste = [];
 let zustand = { konfiguriert: false, online: navigator.onLine, geladen: false, codeFalsch: false, fehler: "" };
-const hoerer = [], statusHoerer = [];
+const hoerer = [], statusHoerer = [], adminHoerer = [];
+let admin = false, adminEmail = "";
 let sendet = false, ladeTimer = null, sendeTimer = null;
 
 // ---------- lokal merken ----------
@@ -30,7 +31,7 @@ function aktualisieren() {
   if (signatur(liste) !== alt) hoerer.forEach(f => f());
   statusMelden();
 }
-function signatur(l) { return l.length + ":" + l.map(e => e.id + "/" + e.ms + "/" + e.name + "/" + e.tr + "/" + e.st).join(","); }
+function signatur(l) { return l.length + ":" + l.map(e => [e.id, e.ms, e.name, e.tr, e.st, e.car, e.ts, e.s ? e.s.join("+") : ""].join("/")).join(","); }
 function statusMelden() { statusHoerer.forEach(f => f(status())); }
 
 // ---------- öffentliche Funktionen ----------
@@ -48,7 +49,41 @@ export function load() {
 
 export function entries() { return liste; }
 export function hatCode() { return !!code; }
-export function isAdmin() { return false; } // Schritt 3: Admin-Login
+export function isAdmin() { return admin; }
+export function darfEintragen() { return !!code || admin; }
+export function adminMail() { return adminEmail; }
+export function onAdmin(f) { adminHoerer.push(f); }
+
+// ---------- Admin ----------
+export async function login(email, passwort) {
+  if (!sb) throw new Error("Keine Verbindung zur Datenbank.");
+  const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: passwort });
+  if (error) throw new Error(/invalid/i.test(error.message) ? "E-Mail oder Passwort falsch." : error.message);
+  await adminPruefen();
+  if (!admin) { await sb.auth.signOut(); throw new Error("Dieses Konto ist kein Admin."); }
+}
+
+export async function logout() {
+  if (sb) await sb.auth.signOut();
+  await adminPruefen();
+}
+
+// Fragt die Datenbank, ob der angemeldete Benutzer Admin ist (dieselbe Regel wie in der Row Level Security).
+async function adminPruefen() {
+  const { data: { session } } = await sb.auth.getSession();
+  let neu = false;
+  if (session) {
+    const { data, error } = await sb.rpc("ist_admin");
+    neu = !error && data === true;
+  }
+  adminEmail = neu ? session.user.email : "";
+  if (neu !== admin) {
+    admin = neu;
+    adminHoerer.forEach(f => f());
+    laden(); senden();
+  }
+  statusMelden();
+}
 
 export function onChange(f) { hoerer.push(f); }
 export function onStatus(f) { statusHoerer.push(f); }
@@ -56,7 +91,7 @@ export function onStatus(f) { statusHoerer.push(f); }
 export function fehlerWeg() { zustand.fehler = ""; statusMelden(); }
 
 export function status() {
-  return { ...zustand, hatCode: !!code, wartend: queue.length };
+  return { ...zustand, hatCode: !!code || admin, admin, wartend: queue.length };
 }
 
 // Neuer Eintrag: sofort sichtbar, dann senden.
@@ -69,7 +104,7 @@ export function add(en) {
   return en;
 }
 
-// Admin-Import (Schritt 3). Zeitstempel aus der CSV bleiben erhalten.
+// Admin-Import. Zeitstempel aus der CSV bleiben erhalten.
 export async function addMany(list) {
   const rows = list.map(en => entryToRow({ ...en, cid: neueId() }, true));
   for (let i = 0; i < rows.length; i += 500) {
@@ -79,12 +114,28 @@ export async function addMany(list) {
   await laden();
 }
 
-// Löschen (Schritt 3, nur Admin – die Datenbank lehnt es für Gäste ab).
+// Löschen (nur Admin – die Datenbank lehnt es für alle anderen ab).
 export async function remove(id) {
   const { data, error } = await sb.from("laps").delete().eq("id", id).select("id");
   if (error) throw new Error(error.message);
-  if (!data || !data.length) throw new Error("Nur der Admin darf löschen.");
+  if (!data || !data.length) throw new Error("Nicht gelöscht. Nur der Admin darf löschen.");
   await laden();
+}
+
+// Ändern (nur Admin). en: { name, tr, st, car, ms, s }
+export async function update(id, en) {
+  const { data, error } = await sb.from("laps").update(aenderungToRow(en)).eq("id", id).select("id");
+  if (error) throw new Error(error.message);
+  if (!data || !data.length) throw new Error("Nicht geändert. Nur der Admin darf ändern.");
+  await laden();
+}
+
+// Alle Zeiten löschen (nur Admin, z. B. nach dem Fest). Gibt die Anzahl zurück.
+export async function removeAll() {
+  const { data, error } = await sb.from("laps").delete().gt("id", 0).select("id");
+  if (error) throw new Error(error.message);
+  await laden();
+  return data ? data.length : 0;
 }
 
 
@@ -106,6 +157,11 @@ function verbinden() {
   window.addEventListener("offline", () => { zustand.online = false; statusMelden(); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { laden(); senden(); } });
   setInterval(() => { laden(); senden(); }, 30000);
+
+  sb.auth.onAuthStateChange(ev => {
+    // Ausserhalb des Auth-Callbacks prüfen (sonst blockiert supabase-js)
+    if (ev === "SIGNED_IN" || ev === "SIGNED_OUT" || ev === "INITIAL_SESSION") setTimeout(adminPruefen, 0);
+  });
 
   laden();
   senden();
@@ -148,7 +204,7 @@ async function laden() {
 
 async function senden() {
   if (!sb || sendet || !queue.length) return;
-  if (!code) { statusMelden(); return; }
+  if (!code && !admin) { statusMelden(); return; }
   sendet = true;
   let erneut = false;
   try {

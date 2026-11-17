@@ -27,6 +27,13 @@ export function entryToRow(en, mitZeit) {
   return row;
 }
 
+// Felder für eine Änderung durch den Admin (client_id und Zeitstempel bleiben unverändert).
+export function aenderungToRow(en) {
+  const r = entryToRow({ ...en, cid: null }, false);
+  delete r.client_id;
+  return r;
+}
+
 // Server-Einträge plus noch nicht bestätigte eigene Einträge (gleiche client_id = schon angekommen).
 export function merge(server, warteschlange) {
   const da = new Set(server.map(e => e.cid).filter(Boolean));
