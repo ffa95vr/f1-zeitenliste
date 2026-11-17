@@ -375,9 +375,14 @@ function tvView(V) {
   bar.appendChild(fb);
   const qrb = el("button", tvQr ? "on" : "", "QR-Code"); qrb.onclick = () => { tvQr = !tvQr; render(); }; bar.appendChild(qrb);
   const xb = el("button", null, "Beenden"); xb.onclick = () => { tab = "wertung"; render(); }; bar.appendChild(xb);
-  V.appendChild(bar); tvBox = el("div", tvQr && store.getCode() ? "tvmitqr" : ""); V.appendChild(tvBox);
-  if (tvQr && store.getCode()) {
-    const q = el("div", "tvqr"); q.appendChild(qrBox(appLink())); q.appendChild(el("div", null, "Zeit eintragen")); V.appendChild(q);
+  V.appendChild(bar);
+  // Rangliste links, QR-Code rechts daneben (im normalen Fluss, damit ihn kein TV-Rand abschneidet)
+  const wrap = el("div", "tvwrap"); tvBox = el("div", "tvliste"); wrap.appendChild(tvBox); V.appendChild(wrap);
+  if (tvQr) {
+    const q = el("div", "tvqr");
+    if (store.getCode()) { q.appendChild(qrBox(appLink())); q.appendChild(el("div", null, "Zeit eintragen")); }
+    else q.appendChild(el("div", "tvqrfehlt", "Kein QR-Code: Seite einmal mit ?code=… im Link öffnen."));
+    wrap.appendChild(q);
   }
   tvN = E().length; tvDraw();
   tvTimer = setInterval(tvTick, 4000);
