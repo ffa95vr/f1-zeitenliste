@@ -114,3 +114,5 @@ body.tv .r1,body.tv .r2,body.tv .r3{border-color:transparent}
 .codein.gross input{font-size:28px;padding:16px;max-width:420px}
 .codein.gross .btn{font-size:24px;padding:16px 26px}
 .codein.gross .msg{font-size:20px}
+.tvstatus{align-self:center;margin-left:auto;font-size:14px;color:var(--mu);max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tvstatus.warn{color:#0B0B0B;background:var(--ac);border-radius:8px;padding:4px 10px;white-space:normal;font-weight:600}

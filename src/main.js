@@ -4,7 +4,7 @@ import "@fontsource/manrope/700.css";
 import "@fontsource/manrope/800.css";
 import "./style.css";
 import qrcode from "qrcode-generator";
-import { STATIONEN as STS, STRECKEN as TR, AUTOS as CARS, fmt, fmtS, fd, gap, best, prevStats,
+import { STATIONEN as STS, STRECKEN as TR, AUTOS as CARS, fmt, fmtS, fd, gap, p2, best, prevStats,
   vorhandeneSchreibweise, pruefeEintrag } from "./zeit.js";
 import { csvText, parseCsv } from "./csv.js";
 import * as store from "./store.js";
@@ -342,8 +342,21 @@ let tvI = 0, tvC = 0, tvN = -1, tvTimer = null, tvPause = false, tvScope = "all"
 
 function stopTv() { if (tvTimer) { clearInterval(tvTimer); tvTimer = null; } tvN = -1; if (document.body) document.body.className = ""; }
 
+// Kleine Zeile im TV: Stand der Daten oder Fehler (die normale Statuszeile ist im TV ausgeblendet).
+let tvStatusEl = null;
+function tvStatus() {
+  if (!tvStatusEl) return;
+  const s = store.status(), z = s.stand ? new Date(s.stand) : null;
+  const uhr = z ? [z.getHours(), z.getMinutes(), z.getSeconds()].map(p2).join(":") : "";
+  tvStatusEl.className = "tvstatus" + (s.ladeFehler ? " warn" : "");
+  tvStatusEl.textContent = s.ladeFehler
+    ? "Keine Verbindung zur Datenbank – " + s.ladeFehler + (uhr ? " · letzter Stand " + uhr : "") + " · " + navigator.userAgent
+    : !s.geladen ? "Lade Zeiten …" : "Live · Stand " + uhr + " · " + E().length + (E().length === 1 ? " Zeit" : " Zeiten");
+}
+
 function tvDraw() {
   if (!tvBox) return;
+  tvStatus();
   if (!store.status().hatCode && tvBox.querySelector(".codein")) return; // Eingabefeld nicht beim Tippen zurücksetzen
   tvBox.textContent = "";
   const T = allTracks(), st = store.status();
@@ -398,6 +411,7 @@ function tvView(V) {
   bar.appendChild(fb);
   const qrb = el("button", tvQr ? "on" : "", "QR-Code"); qrb.onclick = () => { tvQr = !tvQr; render(); }; bar.appendChild(qrb);
   const xb = el("button", null, "Beenden"); xb.onclick = () => { tab = "wertung"; render(); }; bar.appendChild(xb);
+  tvStatusEl = el("div", "tvstatus"); bar.appendChild(tvStatusEl);
   V.appendChild(bar);
   // Rangliste links, QR-Code rechts daneben (im normalen Fluss, damit ihn kein TV-Rand abschneidet)
   const wrap = el("div", "tvwrap"); tvBox = el("div", "tvliste"); wrap.appendChild(tvBox); V.appendChild(wrap);
@@ -649,7 +663,7 @@ function drawStatus(s) {
   if (t) S.appendChild(el("div", "status" + (warn ? " warn" : ""), t));
 }
 
-store.onStatus(drawStatus);
+store.onStatus(s => { drawStatus(s); if (tab === "tv") tvStatus(); });
 store.onAdmin(() => { editId = null; pend = null; render(); });
 store.onChange(() => {
   if (tab === "tv") return tvLive();

@@ -182,11 +182,14 @@ async function laden() {
     const alle = [];
     for (let von = 0; ; von += 1000) {
       const { data, error, status: st } = await sb.from("laps").select(SPALTEN).order("id").range(von, von + 999);
-      if (error) { zustand.online = fehlerArt(error, st) !== "netz"; if (zustand.online) zustand.fehler = error.message; statusMelden(); return; }
+      if (error) {
+        zustand.ladeFehler = "HTTP " + (st || 0) + ": " + (error.message || error.code || "unbekannt");
+        zustand.online = fehlerArt(error, st) !== "netz"; if (zustand.online) zustand.fehler = error.message; statusMelden(); return;
+      }
       alle.push(...data);
       if (data.length < 1000) break;
     }
-    zustand.online = true; zustand.geladen = true;
+    zustand.online = true; zustand.geladen = true; zustand.stand = Date.now(); zustand.ladeFehler = "";
     server = alle.map(rowToEntry);
     // Bestätigte Einträge aus der Warteschlange entfernen
     const da = new Set(server.map(e => e.cid));
@@ -196,6 +199,7 @@ async function laden() {
     schreib(K_CACHE, server);
     aktualisieren();
   } catch (e) {
+    zustand.ladeFehler = (e && (e.name + ": " + e.message)) || String(e);
     zustand.online = false; statusMelden();
   } finally {
     laedt = false;
