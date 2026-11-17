@@ -33,7 +33,7 @@ Datei: `prototype/f1-25-zeitenliste.html` (eine einzelne HTML-Datei, die Daten l
 - **Stationen:** `R21`, `R5` (Lenkrad am PC), `G29` (Logitech G29 an der PS5). Nur diese Namen, **kein** „Rig" davor. Später sollen Geräte frei anlegbar sein.
 - **Strecken:** die 24 Strecken der F1-25-Saison (siehe `TR` im Prototyp), eigene Namen zusätzlich erlaubt. Gleiche Namen unabhängig von Groß/Klein zusammenführen.
 - **Namen der Fahrer:** Groß/Klein ignorieren beim Zusammenführen; vorhandene Schreibweise übernehmen.
-- **Design:** Helles Abrag-Design nach abrag.ch (`#F0F0F0` Hintergrund, `#FFFFFF` Karten, Text `#0B0B0B`) mit Gold/Silber/Bronze für die Plätze 1–3, Schrift Manrope, Akzent Abrag-Orange `#DC6E2D` (Text auf Orange dunkel, orange Schrift auf Weiss `#A9501C`). Name: „F1 25 – Zeitenliste Weihnachtsessen Abrag 2026“. Mobile First, bedienbar mit einer Hand, Touch-Ziele mindestens 44 px. Farben und Abstände stehen als CSS-Variablen am Anfang des Prototyps.
+- **Design:** Helles Abrag-Design nach abrag.ch (`#F0F0F0` Hintergrund, `#FFFFFF` Karten, Text `#0B0B0B`) mit Gold/Silber/Bronze für die Plätze 1–3, Schrift Manrope, Akzent Abrag-Orange `#DC6E2D` (Text auf Orange dunkel, orange Schrift auf Weiss `#A9501C`). TV-Ansicht dunkel (Anthrazit `#141414`), damit der Fernseher nicht blendet. Name: „F1 25 – Zeitenliste Weihnachtsessen Abrag 2026“. Mobile First, bedienbar mit einer Hand, Touch-Ziele mindestens 44 px. Farben und Abstände stehen als CSS-Variablen am Anfang des Prototyps.
 
 ## Version 1 – bis 4. Dezember (die Hauptaufgabe)
 
