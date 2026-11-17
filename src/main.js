@@ -65,8 +65,14 @@ function board(list, V) {
 }
 
 function delBtn(e) {
+  if (!store.isAdmin()) return document.createTextNode(""); // Gäste dürfen nicht löschen
   const x = el("button", "x", pend === e.id ? "Löschen?" : "✕");
-  x.onclick = () => { if (pend === e.id) { store.remove(e.id); pend = null; } else { pend = e.id; } render(); };
+  x.onclick = async () => {
+    if (pend !== e.id) { pend = e.id; render(); return; }
+    pend = null;
+    try { await store.remove(e.id); } catch (err) { alert(err.message); }
+    render();
+  };
   return x;
 }
 
@@ -146,9 +152,9 @@ function qrBox(txt) {
   return box;
 }
 
-function importCsv(txt) {
+async function importCsv(txt) {
   const { neu, sk } = parseCsv(txt, E());
-  if (neu.length) store.addMany(neu);
+  try { if (neu.length) await store.addMany(neu); } catch (err) { return "Import fehlgeschlagen: " + err.message; }
   return neu.length + " Zeiten importiert, " + sk + " übersprungen.";
 }
 
@@ -175,11 +181,12 @@ function mehr(V) {
   };
   c2.appendChild(b3); c2.appendChild(m2); V.appendChild(c2);
 
+  if (!store.isAdmin()) return; // Einspielen nur für den Admin (Schritt 3)
   const c3 = el("div", "card"); c3.appendChild(el("h2", null, "Backup einspielen"));
   c3.appendChild(el("div", "sub", "CSV hier einfügen. Schon vorhandene Zeiten werden nicht doppelt angelegt."));
   const t3 = el("textarea"); t3.placeholder = "CSV einfügen"; c3.appendChild(t3);
   const m3 = el("div", "msg");
-  const b4 = el("button", "btn", "Importieren"); b4.onclick = () => { m3.textContent = importCsv(t3.value); t3.value = ""; }; c3.appendChild(b4); c3.appendChild(m3); V.appendChild(c3);
+  const b4 = el("button", "btn", "Importieren"); b4.onclick = async () => { m3.textContent = "Wird importiert …"; m3.textContent = await importCsv(t3.value); t3.value = ""; }; c3.appendChild(b4); c3.appendChild(m3); V.appendChild(c3);
 }
 
 // ---------- TV-Modus ----------
@@ -204,16 +211,25 @@ function tvDraw() {
   });
 }
 
-function tvTick() {
-  if (tab !== "tv") return;
-  store.reload();
-  const n = E().length;
-  if (tvN >= 0 && n > tvN) {
+// Neue Zeit? Dann sofort zu deren Strecke springen. Gibt true zurück, wenn gesprungen wurde.
+function tvNeu() {
+  const n = E().length, neu = tvN >= 0 && n > tvN;
+  if (neu) {
     const last = E().reduce((a, e) => e.id > a.id ? e : a, E()[0]), T = allTracks();
     tvI = Math.max(0, T.indexOf(last.tr)); tvC = 0;
-  } else if (!tvPause && ++tvC >= 3) { tvC = 0; tvI++; }
-  tvN = n; tvDraw();
+  }
+  tvN = n;
+  return neu;
 }
+
+function tvTick() {
+  if (tab !== "tv") return;
+  if (!tvNeu() && !tvPause && ++tvC >= 3) { tvC = 0; tvI++; }
+  tvDraw();
+}
+
+// Live-Änderung aus der Datenbank
+function tvLive() { tvNeu(); tvDraw(); }
 
 function tvView(V) {
   if (document.body) document.body.className = "tv";
@@ -228,7 +244,7 @@ function tvView(V) {
   bar.appendChild(fb);
   const xb = el("button", null, "Beenden"); xb.onclick = () => { tab = "wertung"; render(); }; bar.appendChild(xb);
   V.appendChild(bar); tvBox = el("div"); V.appendChild(tvBox);
-  store.reload(); tvN = E().length; tvDraw();
+  tvN = E().length; tvDraw();
   tvTimer = setInterval(tvTick, 4000);
 }
 
@@ -377,6 +393,7 @@ function form(V) {
   const m = el("div", "msg");
   const g = el("button", "go", "Zeit speichern");
   g.onclick = () => {
+    if (!store.hatCode()) { m.textContent = "Kein Event-Code. Bitte den QR-Code vor Ort scannen."; return; }
     const r = pruefeEintrag({ name: n.value, strecke: tr.value, zeit: t.value, sektoren: sI.map(i => i.value) });
     if (r.fehler) { m.textContent = r.fehler; return; }
     const tn = vorhandeneSchreibweise(tr.value.trim(), allTracks());
@@ -391,12 +408,48 @@ function form(V) {
     const mm = document.querySelector(".msg");
     if (mm) { mm.textContent = ""; mm.appendChild(makeBanner(pv, r.ms, me.rank, sel, tn)); }
   };
-  c.appendChild(g); c.appendChild(m); V.appendChild(c);
+  c.appendChild(g); c.appendChild(m);
+  c.appendChild(el("div", "sub", "Zeiten und Namen sind für alle mit diesem Link sichtbar."));
+  V.appendChild(c);
   V.appendChild(el("h2", null, "Letzte Einträge"));
-  const last = E().slice(-8).reverse();
-  if (!last.length) V.appendChild(el("div", "empty", "Noch nichts eingetragen."));
-  last.forEach(e => { const r = rowEl(e, true, 0); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(delBtn(e)); V.appendChild(r); });
+  lastBox = el("div"); V.appendChild(lastBox); drawLast();
 }
 
+// Nur die Liste „Letzte Einträge“ neu zeichnen (das Formular bleibt beim Live-Update unangetastet).
+let lastBox = null;
+function drawLast() {
+  if (!lastBox) return;
+  lastBox.textContent = "";
+  const last = E().slice().sort((a, b) => (a.ts - b.ts) || (a.id - b.id)).slice(-8).reverse();
+  if (!last.length) lastBox.appendChild(el("div", "empty", "Noch nichts eingetragen."));
+  last.forEach(e => { const r = rowEl(e, true, 0); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(delBtn(e)); lastBox.appendChild(r); });
+}
+
+// ---------- Statuszeile (Verbindung, wartende Zeiten, Fehler) ----------
+function drawStatus(s) {
+  const S = document.getElementById("status"); if (!S) return;
+  S.textContent = ""; S.className = "status";
+  let t = "", warn = false;
+  if (!s.konfiguriert) { t = s.fehler; warn = true; }
+  else if (!s.hatCode) { t = "Kein Event-Code – bitte den QR-Code vor Ort scannen."; warn = true; }
+  else if (s.codeFalsch) { t = "Event-Code ungültig – bitte den QR-Code neu scannen."; warn = true; }
+  else if (!s.online) { t = "Offline" + (s.wartend ? " – " + s.wartend + (s.wartend === 1 ? " Zeit wartet" : " Zeiten warten") + " auf Versand" : " – zeige zuletzt geladene Zeiten"); warn = true; }
+  else if (s.wartend) { t = s.wartend + (s.wartend === 1 ? " Zeit wird" : " Zeiten werden") + " gesendet …"; }
+  else if (!s.geladen) { t = "Lade Zeiten …"; }
+  if (s.fehler && s.konfiguriert) {
+    const f = el("div", "status warn", s.fehler + " ");
+    const x = el("button", "x", "✕"); x.onclick = () => store.fehlerWeg(); f.appendChild(x); S.appendChild(f);
+  }
+  if (t) S.appendChild(el("div", "status" + (warn ? " warn" : ""), t));
+}
+
+store.onStatus(drawStatus);
+store.onChange(() => {
+  if (tab === "tv") return tvLive();
+  if (tab === "eintragen") return drawLast();
+  if (tab === "mehr") return; // Eingabefelder nicht zurücksetzen
+  render();
+});
 store.load();
+drawStatus(store.status());
 render();

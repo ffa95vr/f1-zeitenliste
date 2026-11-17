@@ -56,3 +56,7 @@ textarea{width:100%;min-height:130px;padding:10px;font:13px monospace;border:1px
 h2{font-size:16px;margin:16px 0 4px}
 .sub{color:var(--mu);font-size:14px;margin:2px 0 8px}
 .empty{color:var(--mu);padding:12px 4px}
+.status{font-size:13px;color:var(--mu);margin:0 0 6px}.status:empty{display:none}
+.status.warn{color:var(--on);background:var(--ac);border-radius:8px;padding:6px 10px;font-weight:600}
+.status.warn .x{color:var(--on);min-width:44px;min-height:32px}
+body.tv .status{display:none}
