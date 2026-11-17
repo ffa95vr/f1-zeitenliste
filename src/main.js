@@ -147,8 +147,9 @@ function tabs() {
 }
 
 function perTrack(V, fn) {
-  const T = ftrack === "*" ? allTracks() : [ftrack];
-  T.forEach(t => fn(t, E().filter(e => e.tr === t)));
+  const T = ftrack === "*" ? allTracks() : [ftrack], G = el("div", "grid");
+  T.forEach(t => { const B = el("div", "trk"); fn(t, E().filter(e => e.tr === t), B); if (B.childNodes.length) G.appendChild(B); });
+  V.appendChild(G);
 }
 
 function podiumBoard(list, V) {
@@ -199,6 +200,14 @@ function qrBox(txt) {
   return box;
 }
 
+// Link für die Gäste: gespeicherte Adresse (z. B. nach dem Hosting) oder die aktuelle, immer mit Event-Code.
+function appLink() {
+  const c = store.getCode();
+  let l = store.getLink() || (location.origin + location.pathname);
+  if (c && !/[?&]code=/.test(l)) l += (l.indexOf("?") > -1 ? "&" : "?") + "code=" + c;
+  return l;
+}
+
 async function importCsv(txt) {
   const { neu, sk } = parseCsv(txt, E());
   try { if (neu.length) await store.addMany(neu); } catch (err) { return "Import fehlgeschlagen: " + err.message; }
@@ -212,7 +221,7 @@ function adminCard(V) {
     const b = el("button", "btn", "Abmelden"); b.onclick = async () => { await store.logout(); render(); }; c.appendChild(b);
     V.appendChild(c); return;
   }
-  c.appendChild(el("div", "sub", "Nur für den Organisator. Gäste brauchen keine Anmeldung."));
+  c.appendChild(el("div", "sub", "Nur für die Organisation. Gäste brauchen keine Anmeldung."));
   c.appendChild(el("label", null, "E-Mail"));
   const em = el("input"); em.type = "email"; em.autocomplete = "username"; c.appendChild(em);
   c.appendChild(el("label", null, "Passwort"));
@@ -248,12 +257,27 @@ function allesLoeschen(V) {
 
 function mehr(V) {
   adminCard(V);
+  const cd = el("div", "card"); cd.appendChild(el("h2", null, "Datenschutz"));
+  cd.appendChild(el("div", "sub", "Welche Daten gespeichert werden und wer sie sieht."));
+  const db = el("button", "btn", "Datenschutz lesen"); db.onclick = () => { tab = "datenschutz"; render(); }; cd.appendChild(db);
+  V.appendChild(cd);
   const c1 = el("div", "card"); c1.appendChild(el("h2", null, "QR-Code zur App"));
-  c1.appendChild(el("div", "sub", "Link der freigegebenen Seite einfügen, dann scannen die Gäste den Code."));
-  const li = el("input"); li.type = "text"; li.autocomplete = "off"; li.placeholder = "https://…"; li.value = store.getLink(); c1.appendChild(li);
+  c1.appendChild(el("div", "sub", "Gäste scannen den Code und landen direkt in der App, der Event-Code ist schon im Link."));
   const qb = el("div"); c1.appendChild(qb);
-  const draw = () => { qb.textContent = ""; if (li.value.trim()) qb.appendChild(qrBox(li.value.trim())); };
-  const b1 = el("button", "btn", "QR-Code erstellen"); b1.onclick = () => { store.setLink(li.value.trim()); draw(); }; c1.appendChild(b1); draw(); V.appendChild(c1);
+  const lt = el("div", "sub mono"); c1.appendChild(lt);
+  const hw = el("div", "sub"); c1.appendChild(hw);
+  const draw = () => {
+    const l = appLink(); qb.textContent = ""; qb.appendChild(qrBox(l)); lt.textContent = l;
+    hw.textContent = !store.getCode() ? "Achtung: Kein Event-Code bekannt. App einmal mit ?code=… öffnen."
+      : /localhost|127\.0\.0\.1/.test(l) ? "„localhost“ funktioniert nur auf diesem Gerät. Für Handys unten die Netzwerk- oder Internet-Adresse eintragen." : "";
+  };
+  draw();
+  if (store.isAdmin()) {
+    c1.appendChild(el("label", null, "Adresse der App (leer = aktuelle Adresse)"));
+    const li = el("input"); li.type = "text"; li.autocomplete = "off"; li.placeholder = location.origin + location.pathname; li.value = store.getLink(); c1.appendChild(li);
+    const b1 = el("button", "btn", "Übernehmen"); b1.onclick = () => { store.setLink(li.value.trim()); draw(); }; c1.appendChild(b1);
+  }
+  V.appendChild(c1);
 
   if (!store.isAdmin()) return; // Backup, Einspielen und Löschen nur für den Admin
   const c2 = el("div", "card"); c2.appendChild(el("h2", null, "Backup als CSV"));
@@ -279,9 +303,26 @@ function mehr(V) {
   allesLoeschen(V);
 }
 
+// ---------- Datenschutz ----------
+function datenschutz(V) {
+  const c = el("div", "card text");
+  c.appendChild(el("h2", null, "Datenschutz"));
+  [
+    ["Wer", "Diese Zeitenliste betreibt die Organisation des Weihnachtsessens für die Gäste vor Ort. Fragen und Wünsche bitte direkt dort."],
+    ["Welche Daten", "Name (gern auch ein Spitzname), Strecke, Station, Auto/Team, Rundenzeit, Sektorzeiten und Zeitpunkt des Eintrags. Kein Konto, keine E-Mail, kein Standort."],
+    ["Wer sie sieht", "Zeiten und Namen sind für alle sichtbar, die den Link mit Event-Code haben, und erscheinen auf dem Fernseher vor Ort."],
+    ["Wo sie liegen", "In einer Datenbank beim Anbieter Supabase, Rechenzentrum in Zürich (Schweiz). Der Hosting-Dienst der Webseite verarbeitet dabei technisch nötige Verbindungsdaten wie die IP-Adresse."],
+    ["Auf deinem Gerät", "Der Browser merkt sich den Event-Code, die zuletzt geladenen Zeiten und noch nicht gesendete Einträge, damit die App auch bei schlechtem Netz funktioniert. Kein Tracking, keine Werbung, keine Analyse, keine Weitergabe."],
+    ["Wie lange", "Nach dem Fest werden die Zeiten gesichert und aus der Datenbank gelöscht."],
+    ["Ändern oder löschen", "Gäste können Einträge nicht selbst ändern oder löschen. Sprich die Organisation an, dann wird dein Eintrag korrigiert oder entfernt."],
+  ].forEach(([h, t]) => { c.appendChild(el("h3", null, h)); c.appendChild(el("p", null, t)); });
+  const b = el("button", "btn", "Zurück"); b.onclick = () => { tab = "eintragen"; render(); }; c.appendChild(b);
+  V.appendChild(c);
+}
+
 // ---------- TV-Modus ----------
 // Alle 4 s neu einlesen, nach 3 Durchgängen (12 s) nächste Strecke, bei neuer Zeit sofort zu deren Strecke.
-let tvI = 0, tvC = 0, tvN = -1, tvTimer = null, tvPause = false, tvScope = "all", tvBox = null;
+let tvI = 0, tvC = 0, tvN = -1, tvTimer = null, tvPause = false, tvScope = "all", tvBox = null, tvQr = true;
 
 function stopTv() { if (tvTimer) { clearInterval(tvTimer); tvTimer = null; } tvN = -1; if (document.body) document.body.className = ""; }
 
@@ -332,8 +373,12 @@ function tvView(V) {
   const fb = el("button", null, "Vollbild");
   fb.onclick = () => { try { const r = document.documentElement.requestFullscreen(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* nicht unterstützt */ } };
   bar.appendChild(fb);
+  const qrb = el("button", tvQr ? "on" : "", "QR-Code"); qrb.onclick = () => { tvQr = !tvQr; render(); }; bar.appendChild(qrb);
   const xb = el("button", null, "Beenden"); xb.onclick = () => { tab = "wertung"; render(); }; bar.appendChild(xb);
-  V.appendChild(bar); tvBox = el("div"); V.appendChild(tvBox);
+  V.appendChild(bar); tvBox = el("div", tvQr && store.getCode() ? "tvmitqr" : ""); V.appendChild(tvBox);
+  if (tvQr && store.getCode()) {
+    const q = el("div", "tvqr"); q.appendChild(qrBox(appLink())); q.appendChild(el("div", null, "Zeit eintragen")); V.appendChild(q);
+  }
   tvN = E().length; tvDraw();
   tvTimer = setInterval(tvTick, 4000);
 }
@@ -346,16 +391,17 @@ function render() {
   const V = document.getElementById("view"); V.textContent = "";
   if (tab === "tv") return tvView(V);
   if (tab === "eintragen") return form(V);
-  if (tab === "mehr") return mehr(V);
+  if (tab === "mehr") { const K = el("div", "karten"); V.appendChild(K); return mehr(K); }
+  if (tab === "datenschutz") return datenschutz(V);
   if (!E().length) { V.appendChild(el("div", "empty", "Noch keine Zeiten eingetragen.")); return; }
   if (tab === "zeiten") return zeiten(V);
   if (tab === "fahrer") return fahrer(V);
   trBar(V);
   if (STS.indexOf(tab) > -1) {
     V.appendChild(el("h2", null, "Station " + tab));
-    perTrack(V, (t, L) => {
+    perTrack(V, (t, L, B) => {
       const SL = L.filter(e => e.st === tab); if (!SL.length) return;
-      V.appendChild(el("h3", null, t + " · " + best(SL).length + " Fahrer")); board(SL, V);
+      B.appendChild(el("h3", null, t + " · " + best(SL).length + " Fahrer")); board(SL, B);
     });
     return;
   }
@@ -377,18 +423,18 @@ function wertung(V) {
     STS.forEach(x => { const b = el("button", zsel[x] ? "on" : "", x); b.onclick = () => { zsel[x] = zsel[x] ? 0 : 1; render(); }; zb.appendChild(b); });
     V.appendChild(zb);
   }
-  perTrack(V, (t, L) => {
-    V.appendChild(el("h2", null, t));
+  perTrack(V, (t, L, B) => {
+    B.appendChild(el("h2", null, t));
     if (wmode === "rig") {
       const S = L.filter(e => e.st === wst);
-      if (S.length) podiumBoard(S, V); else V.appendChild(el("div", "empty", "Noch keine Zeiten an " + wst + "."));
+      if (S.length) podiumBoard(S, B); else B.appendChild(el("div", "empty", "Noch keine Zeiten an " + wst + "."));
       return;
     }
     const chosen = STS.filter(x => zsel[x]);
-    if (!chosen.length) { V.appendChild(el("div", "empty", "Bitte mindestens ein Rig auswählen.")); return; }
+    if (!chosen.length) { B.appendChild(el("div", "empty", "Bitte mindestens ein Rig auswählen.")); return; }
     const Z = L.filter(e => zsel[e.st]);
-    V.appendChild(el("h3", null, "Zusammen: " + chosen.join(" + ")));
-    if (Z.length) podiumBoard(Z, V); else V.appendChild(el("div", "empty", "Noch keine Zeiten an diesen Rigs."));
+    B.appendChild(el("h3", null, "Zusammen: " + chosen.join(" + ")));
+    if (Z.length) podiumBoard(Z, B); else B.appendChild(el("div", "empty", "Noch keine Zeiten an diesen Rigs."));
   });
 }
 
@@ -399,9 +445,10 @@ function gefahren(V) {
   });
   const p = Object.values(P).sort((a, b) => a.name.localeCompare(b.name, "de"));
   V.appendChild(el("h2", null, "Schon gefahren: " + p.length + " von " + LIM)); V.appendChild(el("div", "sub", "Name, Strecken und Runden"));
+  const G = el("div", "liste"); V.appendChild(G);
   p.forEach(x => {
     const n = Object.keys(x.t).length, r = el("div", "row"); r.appendChild(el("div", "nm", x.name));
-    r.appendChild(el("div", "ds", n + (n === 1 ? " Strecke" : " Strecken") + " · " + x.n + (x.n === 1 ? " Zeit" : " Zeiten"))); V.appendChild(r);
+    r.appendChild(el("div", "ds", n + (n === 1 ? " Strecke" : " Strecken") + " · " + x.n + (x.n === 1 ? " Zeit" : " Zeiten"))); G.appendChild(r);
   });
 }
 
@@ -412,10 +459,11 @@ function zeiten(V) {
   const L = E().filter(e => (fn === "*" || e.name === fn) && (ftrack === "*" || e.tr === ftrack));
   L.sort((a, b) => (b.ts - a.ts) || (b.id - a.id));
   V.appendChild(el("h2", null, L.length + (L.length === 1 ? " Zeit" : " Zeiten")));
+  const G = el("div", "liste"); V.appendChild(G);
   L.forEach(e => {
-    if (editId === e.id) { V.appendChild(editCard(e)); return; }
+    if (editId === e.id) { G.appendChild(editCard(e)); return; }
     const r = el("div", "row"), n = el("div", "nm"); n.appendChild(el("div", null, e.name)); n.appendChild(el("div", "sb", sbl(e, true)));
-    r.appendChild(n); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(editBtn(e)); r.appendChild(delBtn(e)); V.appendChild(r);
+    r.appendChild(n); r.appendChild(el("div", "tm", fmt(e.ms))); r.appendChild(editBtn(e)); r.appendChild(delBtn(e)); G.appendChild(r);
   });
 }
 
@@ -427,19 +475,21 @@ function fahrer(V) {
   const T = []; M.forEach(e => { if (T.indexOf(e.tr) < 0) T.push(e.tr); });
   V.appendChild(el("h2", null, fp));
   V.appendChild(el("div", "sub", M.length + (M.length === 1 ? " Zeit" : " Zeiten") + " auf " + T.length + (T.length === 1 ? " Strecke" : " Strecken")));
+  const G = el("div", "grid"); V.appendChild(G);
   T.forEach(t => {
+    const B = el("div", "trk"); G.appendChild(B);
     const L = M.filter(e => e.tr === t), bm = Math.min(...L.map(e => e.ms));
-    V.appendChild(el("h3", null, t + " · Bestzeit " + fmt(bm)));
+    B.appendChild(el("h3", null, t + " · Bestzeit " + fmt(bm)));
     const bs = [0, 1, 2].map(i => { const v = L.map(e => e.s && e.s[i] ? e.s[i] : 0).filter(Boolean); return v.length ? Math.min(...v) : 0; });
-    if (bs[0] && bs[1] && bs[2]) V.appendChild(el("div", "sub", "Ideale Runde (beste Sektoren): " + fmt(bs[0] + bs[1] + bs[2]) + " · S1 " + fmtS(bs[0]) + " · S2 " + fmtS(bs[1]) + " · S3 " + fmtS(bs[2])));
-    if (L.length > 1) V.appendChild(chart(L));
+    if (bs[0] && bs[1] && bs[2]) B.appendChild(el("div", "sub", "Ideale Runde (beste Sektoren): " + fmt(bs[0] + bs[1] + bs[2]) + " · S1 " + fmtS(bs[0]) + " · S2 " + fmtS(bs[1]) + " · S3 " + fmtS(bs[2])));
+    if (L.length > 1) B.appendChild(chart(L));
     L.forEach((e, i) => {
       const r = el("div", "row" + (e.ms === bm ? " r1" : "")), n = el("div", "nm");
       n.appendChild(el("div", null, fd(e.ts) || "ohne Datum")); n.appendChild(el("div", "sb", [e.car, e.st, secStr(e)].filter(x => x).join(" · ")));
       r.appendChild(n);
       const tm = el("div", "tm", fmt(e.ms));
       if (i > 0) { const d = e.ms - L[i - 1].ms; tm.appendChild(el("span", "ds " + (d < 0 ? "up" : d > 0 ? "dn" : ""), (d < 0 ? "−" : "+") + gap(Math.abs(d)))); }
-      r.appendChild(tm); V.appendChild(r);
+      r.appendChild(tm); B.appendChild(r);
     });
   });
 }
@@ -500,15 +550,38 @@ function form(V) {
     if (mm) { mm.textContent = ""; mm.appendChild(makeBanner(pv, r.ms, me.rank, sel, tn)); }
   };
   c.appendChild(g); c.appendChild(m);
-  c.appendChild(el("div", "sub", "Zeiten und Namen sind für alle mit diesem Link sichtbar."));
-  V.appendChild(c);
-  V.appendChild(el("h2", null, "Letzte Einträge"));
-  lastBox = el("div"); V.appendChild(lastBox); drawLast();
+  const hw = el("div", "sub", "Zeiten und Namen sind für alle mit diesem Link sichtbar. ");
+  const dl = el("button", "link", "Datenschutz"); dl.onclick = () => { tab = "datenschutz"; render(); }; hw.appendChild(dl);
+  c.appendChild(hw);
+  const S = el("div", "split"), R = el("div", "seite");
+  S.appendChild(c); S.appendChild(R); V.appendChild(S);
+  rankBox = el("div", "nur-pc"); R.appendChild(rankBox);
+  R.appendChild(el("h2", null, "Letzte Einträge"));
+  lastBox = el("div"); R.appendChild(lastBox); drawLast();
+}
+
+// PC-Ansicht: Rangliste der zuletzt gewählten Strecke neben dem Formular (alle Stationen, beste Zeit pro Fahrer).
+let rankBox = null;
+function drawRank() {
+  if (!rankBox) return;
+  rankBox.textContent = "";
+  const T = allTracks();
+  const tn = T.indexOf(ctrack) > -1 ? ctrack : (E().length ? E().slice().sort((a, b) => (a.ts - b.ts) || (a.id - b.id)).pop().tr : "");
+  if (!tn) return;
+  rankBox.appendChild(el("h2", null, "Rangliste " + tn + " · alle Rigs"));
+  const L = E().filter(e => e.tr === tn), b = best(L).slice(0, 10);
+  b.forEach(x => {
+    const r = rowEl(x, false, x.rank), t = el("div", "tm", fmt(x.ms));
+    if (x.rank > 1) t.appendChild(el("span", "ds", "+" + gap(x.ms - b[0].ms)));
+    r.querySelector(".sb").textContent = [x.st, x.car].filter(Boolean).join(" · ");
+    r.appendChild(t); rankBox.appendChild(r);
+  });
 }
 
 // Nur die Liste „Letzte Einträge“ neu zeichnen (das Formular bleibt beim Live-Update unangetastet).
 let lastBox = null;
 function drawLast() {
+  drawRank();
   if (!lastBox) return;
   lastBox.textContent = "";
   const last = E().slice().sort((a, b) => (a.ts - b.ts) || (a.id - b.id)).slice(-8).reverse();

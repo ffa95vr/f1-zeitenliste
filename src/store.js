@@ -49,6 +49,7 @@ export function load() {
 
 export function entries() { return liste; }
 export function hatCode() { return !!code; }
+export function getCode() { return code; }
 export function isAdmin() { return admin; }
 export function darfEintragen() { return !!code || admin; }
 export function adminMail() { return adminEmail; }
