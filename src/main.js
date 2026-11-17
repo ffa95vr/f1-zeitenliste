@@ -175,13 +175,13 @@ function chart(L) {
   s.setAttribute("viewBox", "0 0 " + w + " " + h); s.setAttribute("role", "img"); s.setAttribute("aria-label", "Verlauf der Rundenzeiten");
   const mk = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
   const pts = L.map((e, i) => [16 + i * (w - 32) / (n - 1), 20 + (e.ms - mn) / sp * (h - 44)]);
-  s.appendChild(mk("polyline", { points: pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" "), fill: "none", stroke: "#AAB4CC", "stroke-width": 2 }));
+  s.appendChild(mk("polyline", { points: pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" "), fill: "none", stroke: "#9A9A9A", "stroke-width": 2 }));
   pts.forEach((p, i) => {
     const b = L[i].ms === mn;
-    s.appendChild(mk("circle", { cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: b ? 6 : 4, fill: b ? "#F2C94C" : "#1B2747", stroke: b ? "#F2C94C" : "#AAB4CC", "stroke-width": 2 }));
+    s.appendChild(mk("circle", { cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: b ? 6 : 4, fill: b ? "#DC6E2D" : "#FFFFFF", stroke: b ? "#DC6E2D" : "#9A9A9A", "stroke-width": 2 }));
   });
-  const t1 = mk("text", { x: 4, y: 11, fill: "#AAB4CC", "font-size": 11 }); t1.textContent = "schneller: " + fmt(mn); s.appendChild(t1);
-  const t2 = mk("text", { x: 4, y: h - 3, fill: "#AAB4CC", "font-size": 11 }); t2.textContent = "langsamer: " + fmt(mx); s.appendChild(t2);
+  const t1 = mk("text", { x: 4, y: 11, fill: "#555555", "font-size": 11 }); t1.textContent = "schneller: " + fmt(mn); s.appendChild(t1);
+  const t2 = mk("text", { x: 4, y: h - 3, fill: "#555555", "font-size": 11 }); t2.textContent = "langsamer: " + fmt(mx); s.appendChild(t2);
   const d = el("div", "chart"); d.appendChild(s); return d;
 }
 
