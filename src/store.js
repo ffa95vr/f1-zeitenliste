@@ -190,6 +190,7 @@ async function laden() {
       if (data.length < 1000) break;
     }
     zustand.online = true; zustand.geladen = true; zustand.stand = Date.now(); zustand.ladeFehler = "";
+    codePruefen();
     server = alle.map(rowToEntry);
     // Bestätigte Einträge aus der Warteschlange entfernen
     const da = new Set(server.map(e => e.cid));
@@ -205,6 +206,18 @@ async function laden() {
     laedt = false;
     if (nochmal) { nochmal = false; laden(); }
   }
+}
+
+// Falscher Code liefert beim Lesen keine Fehlermeldung, sondern eine leere Liste.
+// Deshalb einmal pro Code bei der Datenbank nachfragen (dieselbe Funktion wie in der Row Level Security).
+let geprueft = "";
+async function codePruefen() {
+  if (!code || admin || geprueft === code) return;
+  const { data, error } = await sb.rpc("event_code_ok");
+  if (error) return; // später nochmal versuchen
+  geprueft = code;
+  const falsch = data !== true;
+  if (falsch !== zustand.codeFalsch) { zustand.codeFalsch = falsch; statusMelden(); }
 }
 
 async function senden() {

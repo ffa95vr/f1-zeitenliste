@@ -310,7 +310,7 @@ function codeEingabe(V, gross) {
   const i = el("input"); i.type = "text"; i.autocomplete = "off"; i.placeholder = "Event-Code"; i.setAttribute("autocapitalize", "off");
   const b = el("button", "btn", "Übernehmen"), m = el("div", "msg");
   const go = () => {
-    const c = i.value.trim();
+    const c = i.value.trim().toLowerCase().replace(/\s+/g, "");
     if (!/^[A-Za-z0-9_-]{4,64}$/.test(c)) { m.textContent = "Bitte den Event-Code eingeben (Buchstaben und Ziffern)."; return; }
     location.href = location.pathname + "?code=" + encodeURIComponent(c);
   };
@@ -357,12 +357,13 @@ function tvStatus() {
 function tvDraw() {
   if (!tvBox) return;
   tvStatus();
-  if (!store.status().hatCode && tvBox.querySelector(".codein")) return; // Eingabefeld nicht beim Tippen zurücksetzen
+  const sx = store.status();
+  if ((!sx.hatCode || sx.codeFalsch) && tvBox.querySelector(".codein")) return; // Eingabefeld nicht beim Tippen zurücksetzen
   tvBox.textContent = "";
   const T = allTracks(), st = store.status();
-  if (!st.hatCode) {
-    tvBox.appendChild(el("div", "tvh", "Kein Event-Code"));
-    tvBox.appendChild(el("div", "tvhinweis", "Dieser Bildschirm kennt den Event-Code nicht und kann keine Zeiten laden. Code hier eingeben:"));
+  if (!st.hatCode || st.codeFalsch) {
+    tvBox.appendChild(el("div", "tvh", st.codeFalsch ? "Event-Code ungültig" : "Kein Event-Code"));
+    tvBox.appendChild(el("div", "tvhinweis", (st.codeFalsch ? "Der gespeicherte Code („" + store.getCode() + "“) stimmt nicht, deshalb erscheinen keine Zeiten." : "Dieser Bildschirm kennt den Event-Code nicht und kann keine Zeiten laden.") + " Code hier eingeben:"));
     codeEingabe(tvBox, true);
     return;
   }
@@ -663,7 +664,15 @@ function drawStatus(s) {
   if (t) S.appendChild(el("div", "status" + (warn ? " warn" : ""), t));
 }
 
-store.onStatus(s => { drawStatus(s); if (tab === "tv") tvStatus(); });
+let tvCodeAlt = null;
+store.onStatus(s => {
+  drawStatus(s);
+  if (tab !== "tv") return;
+  tvStatus();
+  const k = s.hatCode + "/" + s.codeFalsch;
+  if (tvCodeAlt !== null && k !== tvCodeAlt && tvBox) { tvBox.textContent = ""; tvDraw(); }
+  tvCodeAlt = k;
+});
 store.onAdmin(() => { editId = null; pend = null; render(); });
 store.onChange(() => {
   if (tab === "tv") return tvLive();
